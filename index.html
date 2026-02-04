@@ -42,8 +42,11 @@ header select{margin-top:8px;padding:6px;font-size:15px}
 const CSV_URL =
 "https://docs.google.com/spreadsheets/d/e/2PACX-1vQiwyUYwisLGMaEdGumfanbDofdtZT1rnagpF5pt2as1noClta4z-yCb8VcvvMwfvGxLP3j9XAxijcl/pub?gid=2102212403&single=true&output=csv";
 
-let items = [];
-let totalKRW = 0; // ⭐ 永久累積韓幣（重點）
+let items=[];
+
+function num(v){
+  return Number(String(v).replace(/,/g,"")) || 0;
+}
 
 function parseCSV(t){
   const r=[];let row=[],c="",q=false;
@@ -68,10 +71,10 @@ fetch(CSV_URL)
     items.push({
       name:r[1],
       img:r[2],
-      early:+r[3]||0,
-      offline:+r[4]||0,
-      presale:+r[5]||0,
-      krw:+r[6]||0,
+      early:num(r[3]),
+      offline:num(r[4]),
+      presale:num(r[5]),
+      krw:num(r[6]),
       qty:0
     });
   });
@@ -92,43 +95,36 @@ function render(){
   });
 }
 
-document.getElementById("mode").onchange = calc;
+document.getElementById("mode").onchange=calc;
 
 function calc(){
-  let qty=0;
-  let display=0;
-  let bonusKRW=0;
+  let qty=0, display=0, bonusKRW=0;
   const m=document.getElementById("mode").value;
 
-  totalKRW = 0; // ⭐ 每次重新計算全部韓幣
-
   items.forEach(p=>{
-    qty += p.qty;
-    totalKRW += p.qty * p.krw;
+    qty+=p.qty;
 
     if(m==="early"){
-      display += p.qty * p.early;
-      if(p.early>0) bonusKRW += p.qty * p.krw;
+      display+=p.qty*p.early;
+      if(p.early>0) bonusKRW+=p.qty*p.krw;
     }
     if(m==="offline"){
-      display += p.qty * p.offline;
-      if(p.offline>0) bonusKRW += p.qty * p.krw;
+      display+=p.qty*p.offline;
+      if(p.offline>0) bonusKRW+=p.qty*p.krw;
     }
     if(m==="presale"){
-      display += p.qty * p.presale;
-      bonusKRW += p.qty * p.krw;
+      display+=p.qty*p.presale;
+      bonusKRW+=p.qty*p.krw;
     }
     if(m==="krw"){
-      display += p.qty * p.krw;
-      bonusKRW = totalKRW;
+      display+=p.qty*p.krw;
+      bonusKRW+=p.qty*p.krw;
     }
   });
 
-  totalQty.innerText = qty;
-  totalPrice.innerText =
-    (m==="krw" ? "₩ " : "NT$ ") + display.toLocaleString();
-
-  bonus.innerText = Math.floor(bonusKRW / 50000);
+  totalQty.innerText=qty;
+  totalPrice.innerText=(m==="krw"?"₩ ":"NT$ ")+display.toLocaleString();
+  bonus.innerText=Math.floor(bonusKRW/50000);
 }
 </script>
 
