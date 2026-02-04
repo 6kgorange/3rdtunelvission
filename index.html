@@ -39,23 +39,32 @@ header select{margin-top:8px;padding:6px;font-size:15px}
 </div>
 
 <script>
-// ✅ 已幫你填好 CSV
 const CSV_URL =
 "https://docs.google.com/spreadsheets/d/e/2PACX-1vQiwyUYwisLGMaEdGumfanbDofdtZT1rnagpF5pt2as1noClta4z-yCb8VcvvMwfvGxLP3j9XAxijcl/pub?gid=2102212403&single=true&output=csv";
 
 let items = [];
 
-// 穩定 CSV 解析（支援引號、逗號、網址）
+// 🔥 不管你丟什麼 Google Drive 連結，都轉成能顯示的
+function normalizeImage(url){
+  if(!url) return "";
+  url = String(url).replace(/^"|"$/g,"").trim();
+  if(url.includes("drive.google.com")){
+    const m = url.match(/[-\w]{25,}/);
+    if(m) return "https://drive.google.com/uc?export=view&id=" + m[0];
+  }
+  return url;
+}
+
+// 穩定 CSV 解析
 function parseCSV(text){
-  const rows=[];
-  let row=[],cur="",inQuotes=false;
+  const rows=[]; let row=[],cur="",q=false;
   for(let i=0;i<text.length;i++){
     const c=text[i],n=text[i+1];
-    if(c=='"' && inQuotes && n=='"'){cur+='"';i++;}
-    else if(c=='"'){inQuotes=!inQuotes;}
-    else if(c=="," && !inQuotes){row.push(cur);cur="";}
-    else if(c=="\n" && !inQuotes){row.push(cur);rows.push(row);row=[];cur="";}
-    else{cur+=c;}
+    if(c=='"'&&q&&n=='"'){cur+='"';i++}
+    else if(c=='"'){q=!q}
+    else if(c==","&&!q){row.push(cur);cur=""}
+    else if(c=="\n"&&!q){row.push(cur);rows.push(row);row=[];cur=""}
+    else cur+=c
   }
   if(cur) row.push(cur);
   if(row.length) rows.push(row);
@@ -69,12 +78,12 @@ fetch(CSV_URL)
     data.slice(1).forEach(r=>{
       if(!r[1]) return;
       items.push({
-        name: String(r[1]).replace(/^"|"$/g,"").trim(),
-        img: String(r[2]).replace(/^"|"$/g,"").trim(),
-        early: Number(String(r[3]).replace(/"/g,""))||0,
-        offline: Number(String(r[4]).replace(/"/g,""))||0,
-        presale: Number(String(r[5]).replace(/"/g,""))||0,
-        krw: Number(String(r[6]).replace(/"/g,""))||0,
+        name: r[1],
+        img: normalizeImage(r[2]),
+        early: Number(r[3])||0,
+        offline: Number(r[4])||0,
+        presale: Number(r[5])||0,
+        krw: Number(r[6])||0,
         qty: 0
       });
     });
@@ -90,34 +99,27 @@ function render(){
         <img src="${p.img}" onerror="this.src='https://via.placeholder.com/300?text=NO+IMAGE'">
         <div class="name">${p.name}</div>
         <input type="number" min="0" value="0" oninput="setQty(${i},this.value)">
-      </div>
-    `;
+      </div>`;
   });
 }
 
 function setQty(i,v){
-  items[i].qty = Number(v)||0;
-  calc();
+  items[i].qty=Number(v)||0; calc();
 }
-
-document.getElementById("mode").onchange = calc;
+document.getElementById("mode").onchange=calc;
 
 function calc(){
-  let qty=0,total=0,krwSum=0;
-  const mode=document.getElementById("mode").value;
+  let q=0,t=0,k=0,m=document.getElementById("mode").value;
   items.forEach(p=>{
-    qty+=p.qty;
-    krwSum+=p.qty*p.krw;
-    if(mode==="early") total+=p.qty*p.early;
-    if(mode==="offline") total+=p.qty*p.offline;
-    if(mode==="presale") total+=p.qty*p.presale;
-    if(mode==="krw") total+=p.qty*p.krw;
+    q+=p.qty; k+=p.qty*p.krw;
+    if(m=="early")t+=p.qty*p.early;
+    if(m=="offline")t+=p.qty*p.offline;
+    if(m=="presale")t+=p.qty*p.presale;
+    if(m=="krw")t+=p.qty*p.krw;
   });
-  document.getElementById("totalQty").innerText = qty;
-  document.getElementById("totalPrice").innerText =
-    (mode==="krw"?"₩ ":"NT$ ") + total.toLocaleString();
-  document.getElementById("bonus").innerText =
-    Math.floor(krwSum/50000);
+  totalQty.innerText=q;
+  totalPrice.innerText=(m=="krw"?"₩ ":"NT$ ")+t.toLocaleString();
+  bonus.innerText=Math.floor(k/50000);
 }
 </script>
 
