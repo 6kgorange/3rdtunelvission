@@ -101,26 +101,34 @@ function calc(){
   let qty=0, display=0, bonusKRW=0;
   const m=document.getElementById("mode").value;
 
-  items.forEach(p=>{
-    qty+=p.qty;
+items.forEach(p=>{
+  qty += p.qty;
 
-    if(m==="early"){
-      display+=p.qty*p.early;
-      if(p.early>0) bonusKRW+=p.qty*p.krw;
-    }
-    if(m==="offline"){
-      display+=p.qty*p.offline;
-      if(p.offline>0) bonusKRW+=p.qty*p.krw;
-    }
-    if(m==="presale"){
-      display+=p.qty*p.presale;
-      bonusKRW+=p.qty*p.krw;
-    }
-    if(m==="krw"){
-      display+=p.qty*p.krw;
-      bonusKRW+=p.qty*p.krw;
-    }
-  });
+  // 顯示金額
+  if(m==="early")   display += p.qty * p.early;
+  if(m==="offline") display += p.qty * p.offline;
+  if(m==="presale") display += p.qty * p.presale;
+  if(m==="krw")     display += p.qty * p.krw;
+
+  // ===== 滿額卡（重點修正）=====
+  if(m==="early" && p.early > 0){
+    bonusKRW += p.qty * p.krw;
+  }
+
+  if(m==="offline" && p.offline > 0){
+    bonusKRW += p.qty * p.krw;
+  }
+
+  // ✅ 預售：只要有數量，一定算韓幣
+  if(m==="presale" && p.qty > 0){
+    bonusKRW += p.qty * p.krw;
+  }
+
+  // ✅ 韓幣確認模式：全部都算
+  if(m==="krw"){
+    bonusKRW += p.qty * p.krw;
+  }
+});
 
   totalQty.innerText=qty;
   totalPrice.innerText=(m==="krw"?"₩ ":"NT$ ")+display.toLocaleString();
