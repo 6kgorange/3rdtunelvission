@@ -34,92 +34,98 @@ header select{margin-top:8px;padding:6px;font-size:15px}
 
 <div class="summary">
   <div>總數量：<span id="totalQty">0</span></div>
-  <div>總金額：<span id="totalPrice">NT$ 0</span></div>
-  <div>滿額卡：<span id="bonus">0</span> 張</div>
+  <div>顯示金額：<span id="totalPrice">0</span></div>
+  <div>韓幣滿額卡：<span id="bonus">0</span> 張</div>
 </div>
 
 <script>
 const CSV_URL =
 "https://docs.google.com/spreadsheets/d/e/2PACX-1vQiwyUYwisLGMaEdGumfanbDofdtZT1rnagpF5pt2as1noClta4z-yCb8VcvvMwfvGxLP3j9XAxijcl/pub?gid=2102212403&single=true&output=csv";
 
-let items = [];
+let items=[];
 
-// 🔥 不管你丟什麼 Google Drive 連結，都轉成能顯示的
-function normalizeImage(url){
-  if(!url) return "";
-  url = String(url).replace(/^"|"$/g,"").trim();
-  if(url.includes("drive.google.com")){
-    const m = url.match(/[-\w]{25,}/);
-    if(m) return "https://drive.google.com/uc?export=view&id=" + m[0];
+function parseCSV(t){
+  const r=[];let row=[],c="",q=false;
+  for(let i=0;i<t.length;i++){
+    const x=t[i],n=t[i+1];
+    if(x=='"'&&q&&n=='"'){c+='"';i++}
+    else if(x=='"'){q=!q}
+    else if(x==","&&!q){row.push(c);c=""}
+    else if(x=="\n"&&!q){row.push(c);r.push(row);row=[];c=""}
+    else c+=x
   }
-  return url;
-}
-
-// 穩定 CSV 解析
-function parseCSV(text){
-  const rows=[]; let row=[],cur="",q=false;
-  for(let i=0;i<text.length;i++){
-    const c=text[i],n=text[i+1];
-    if(c=='"'&&q&&n=='"'){cur+='"';i++}
-    else if(c=='"'){q=!q}
-    else if(c==","&&!q){row.push(cur);cur=""}
-    else if(c=="\n"&&!q){row.push(cur);rows.push(row);row=[];cur=""}
-    else cur+=c
-  }
-  if(cur) row.push(cur);
-  if(row.length) rows.push(row);
-  return rows;
+  if(c) row.push(c);
+  if(row.length) r.push(row);
+  return r;
 }
 
 fetch(CSV_URL)
-  .then(r=>r.text())
-  .then(t=>{
-    const data=parseCSV(t);
-    data.slice(1).forEach(r=>{
-      if(!r[1]) return;
-      items.push({
-        name: r[1],
-        img: normalizeImage(r[2]),
-        early: Number(r[3])||0,
-        offline: Number(r[4])||0,
-        presale: Number(r[5])||0,
-        krw: Number(r[6])||0,
-        qty: 0
-      });
+.then(r=>r.text())
+.then(t=>{
+  parseCSV(t).slice(1).forEach(r=>{
+    if(!r[1]) return;
+    items.push({
+      name:r[1],
+      img:r[2],
+      early:+r[3]||0,
+      offline:+r[4]||0,
+      presale:+r[5]||0,
+      krw:+r[6]||0,
+      qty:0
     });
-    render();
   });
+  render();
+});
 
 function render(){
-  const box=document.getElementById("products");
-  box.innerHTML="";
+  const b=document.getElementById("products");
+  b.innerHTML="";
   items.forEach((p,i)=>{
-    box.innerHTML+=`
-      <div class="card">
-        <img src="${p.img}" onerror="this.src='https://via.placeholder.com/300?text=NO+IMAGE'">
-        <div class="name">${p.name}</div>
-        <input type="number" min="0" value="0" oninput="setQty(${i},this.value)">
-      </div>`;
+    b.innerHTML+=`
+    <div class="card">
+      <img src="${p.img}">
+      <div class="name">${p.name}</div>
+      <input type="number" min="0" value="0"
+        oninput="items[${i}].qty=this.valueAsNumber||0;calc()">
+    </div>`;
   });
 }
 
-function setQty(i,v){
-  items[i].qty=Number(v)||0; calc();
-}
 document.getElementById("mode").onchange=calc;
 
 function calc(){
-  let q=0,t=0,k=0,m=document.getElementById("mode").value;
+  let qty=0;
+  let display=0;
+  let krwForBonus=0;
+  const m=document.getElementById("mode").value;
+
   items.forEach(p=>{
-    q+=p.qty; k+=p.qty*p.krw;
-    if(m=="early")t+=p.qty*p.early;
-    if(m=="offline")t+=p.qty*p.offline;
-    if(m=="presale")t+=p.qty*p.presale;
-    if(m=="krw")t+=p.qty*p.krw;
+    qty+=p.qty;
+
+    // 顯示金額
+    if(m==="early")   display+=p.qty*p.early;
+    if(m==="offline") display+=p.qty*p.offline;
+    if(m==="presale") display+=p.qty*p.presale;
+    if(m==="krw")     display+=p.qty*p.krw;
+
+    // 韓幣滿額計算規則
+    if(m==="early" && p.early>0){
+      krwForBonus+=p.qty*p.krw;
+    }
+    if(m==="offline" && p.offline>0){
+      krwForBonus+=p.qty*p.krw;
+    }
+    if(m==="presale"){
+      krwForBonus+=p.qty*p.krw;
+    }
+    if(m==="krw"){
+      krwForBonus+=p.qty*p.krw;
+    }
   });
-  totalQty.innerText=q;
-  totalPrice.innerText=(m=="krw"?"₩ ":"NT$ ")+t.toLocaleString();
-  bonus.innerText=Math.floor(k/50000);
+
+  totalQty.innerText=qty;
+  totalPrice.innerText=(m==="krw"?"₩ ":"NT$ ")+display.toLocaleString();
+  bonus.innerText=Math.floor(krwForBonus/50000);
 }
 </script>
 
