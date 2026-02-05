@@ -1,3 +1,10 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<title>三巡周邊試算</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
 <style>
 *{box-sizing:border-box}
 
@@ -42,7 +49,7 @@ header select{
   box-shadow:0 1px 4px rgba(0,0,0,.08)
 }
 
-/* 圖片：關鍵縮小 */
+/* 圖片 */
 .card img{
   width:100%;
   aspect-ratio:1/1;
@@ -51,7 +58,7 @@ header select{
   background:#eee
 }
 
-/* 文字 */
+/* 名稱 */
 .name{
   font-size:12px;
   margin:4px 0;
@@ -66,7 +73,7 @@ header select{
   font-size:14px
 }
 
-/* Summary：不吃畫面 */
+/* Summary */
 .summary{
   position:sticky;
   bottom:0;
@@ -80,38 +87,138 @@ header select{
   margin:2px 0;
 }
 
-/* 📱 平板 */
+/* 平板 */
 @media (min-width:768px){
   .products{
     grid-template-columns:repeat(4,1fr);
   }
 }
 
-/* 💻 桌機：重點 */
+/* 桌機 */
 @media (min-width:1200px){
   .products{
-    grid-template-columns:repeat(6,1fr); /* 一次看完 */
-    gap:12px;
+    grid-template-columns:repeat(6,1fr);
   }
-
   body{
     font-size:13px;
   }
-
-  .card{
-    padding:5px;
-  }
-
   .name{
     font-size:11px;
     min-height:24px;
   }
 }
 
-/* 🖥 超寬螢幕 */
+/* 超寬 */
 @media (min-width:1600px){
   .products{
     grid-template-columns:repeat(8,1fr);
   }
 }
 </style>
+</head>
+
+<body>
+
+<header>
+  <h3>三巡周邊試算</h3>
+  <select id="mode">
+    <option value="early">早鳥線上</option>
+    <option value="offline">線下</option>
+    <option value="presale">線上預售</option>
+    <option value="krw">韓幣</option>
+  </select>
+</header>
+
+<div id="products" class="products"></div>
+
+<div class="summary">
+  <div>總數量：<span id="totalQty">0</span></div>
+  <div>顯示金額：<span id="totalPrice">0</span></div>
+  <div>韓幣滿額卡：<span id="bonus">0</span> 張</div>
+</div>
+
+<script>
+const CSV_URL =
+"https://docs.google.com/spreadsheets/d/e/2PACX-1vQiwyUYwisLGMaEdGumfanbDofdtZT1rnagpF5pt2as1noClta4z-yCb8VcvvMwfvGxLP3j9XAxijcl/pub?gid=2102212403&single=true&output=csv";
+
+let items=[];
+
+function num(v){
+  return Number(String(v).replace(/,/g,"")) || 0;
+}
+
+function parseCSV(t){
+  const r=[];let row=[],c="",q=false;
+  for(let i=0;i<t.length;i++){
+    const x=t[i],n=t[i+1];
+    if(x=='"'&&q&&n=='"'){c+='"';i++}
+    else if(x=='"'){q=!q}
+    else if(x==","&&!q){row.push(c);c=""}
+    else if(x=="\n"&&!q){row.push(c);r.push(row);row=[];c=""}
+    else c+=x
+  }
+  if(c) row.push(c);
+  if(row.length) r.push(row);
+  return r;
+}
+
+fetch(CSV_URL)
+.then(r=>r.text())
+.then(t=>{
+  parseCSV(t).slice(1).forEach(r=>{
+    if(!r[1]) return;
+    items.push({
+      name:r[1],
+      img:r[2],
+      early:num(r[3]),
+      offline:num(r[4]),
+      presale:num(r[5]),
+      krw:num(r[6]),
+      qty:0
+    });
+  });
+  render();
+});
+
+function render(){
+  const box=document.getElementById("products");
+  box.innerHTML="";
+  items.forEach((p,i)=>{
+    box.innerHTML+=`
+    <div class="card">
+      <img src="${p.img}">
+      <div class="name">${p.name}</div>
+      <input type="number" min="0" value="0"
+        oninput="items[${i}].qty=this.valueAsNumber||0;calc()">
+    </div>`;
+  });
+}
+
+document.getElementById("mode").onchange=calc;
+
+function calc(){
+  let qty=0, display=0, bonusKRW=0;
+  const m=document.getElementById("mode").value;
+
+  items.forEach(p=>{
+    qty += p.qty;
+
+    if(m==="early")   display += p.qty * p.early;
+    if(m==="offline") display += p.qty * p.offline;
+    if(m==="presale") display += p.qty * p.presale;
+    if(m==="krw")     display += p.qty * p.krw;
+
+    if(m==="early" && p.early>0)   bonusKRW += p.qty*p.krw;
+    if(m==="offline" && p.offline>0) bonusKRW += p.qty*p.krw;
+    if(m==="presale" && p.qty>0)   bonusKRW += p.qty*p.krw;
+    if(m==="krw") bonusKRW += p.qty*p.krw;
+  });
+
+  totalQty.innerText=qty;
+  totalPrice.innerText=(m==="krw"?"₩ ":"NT$ ")+display.toLocaleString();
+  bonus.innerText=Math.floor(bonusKRW/50000);
+}
+</script>
+
+</body>
+</html>
